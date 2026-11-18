@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jay Executor - Script Library</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 25px;
+    background: #090b14;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+}
+
+h1 {
+    color: #8b5cf6;
+}
+
+.panel {
+    background: #151827;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+input, textarea, select {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid #30364d;
+    border-radius: 7px;
+    background: #0c1020;
+    color: white;
+}
+
+textarea {
+    min-height: 150px;
+    resize: vertical;
+}
+
+button {
+    padding: 10px 15px;
+    margin: 5px 3px 5px 0;
+    border: none;
+    border-radius: 7px;
+    background: #7c3aed;
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #6d28d9;
+}
+
+.delete {
+    background: #dc2626;
+}
+
+.script {
+    background: #20263a;
+    padding: 15px;
+    border-radius: 9px;
+    margin: 12px 0;
+    overflow-wrap: anywhere;
+}
+
+small {
+    color: #a5a9bd;
+}
+
+#message {
+    color: #4ade80;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📚 Jay Executor V2</h1>
+<h2>My Script Library</h2>
+
+<div class="panel">
+    <h3>Save a Script</h3>
+
+    <input id="scriptName" placeholder="Script name">
+
+    <input id="gameName" placeholder="Game name (optional)">
+
+    <input id="category" placeholder="Category (optional)">
+
+    <textarea id="scriptCode" placeholder="Paste your script here..."></textarea>
+
+    <button onclick="saveScript()">💾 Save Script</button>
+
+    <p id="message"></p>
+</div>
+
+<div class="panel">
+    <h3>🔎 Search Scripts</h3>
+
+    <input
+        id="search"
+        placeholder="Search by name or game..."
+        oninput="displayScripts()"
+    >
+
+    <select id="gameFilter" onchange="displayScripts()">
+        <option value="">All Games</option>
+    </select>
+
+    <select id="categoryFilter" onchange="displayScripts()">
+        <option value="">All Categories</option>
+    </select>
+</div>
+
+<div class="panel">
+    <h3>📂 Saved Scripts</h3>
+    <div id="scriptList"></div>
+</div>
+
+</div>
+
+<script src="library.js"></script>
+
+<script>
+function saveScript() {
+    const name = document.getElementById("scriptName").value.trim();
+    const game = document.getElementById("gameName").value.trim();
+    const category = document.getElementById("category").value.trim();
+    const code = document.getElementById("scriptCode").value;
+
+    if (!name || !code.trim()) {
+        alert("Please enter a script name and script code.");
+        return;
+    }
+
+    try {
+        JayLibrary.save(name, code, game || "Uncategorized", category || "General");
+
+        document.getElementById("scriptName").value = "";
+        document.getElementById("gameName").value = "";
+        document.getElementById("category").value = "";
+        document.getElementById("scriptCode").value = "";
+
+        document.getElementById("message").textContent = "Script saved successfully!";
+
+        displayScripts();
+    } catch (error) {
+        alert("Could not save script: " + error.message);
+    }
+}
+
+function displayScripts() {
+    const list = document.getElementById("scriptList");
+    const search = document.getElementById("search").value.toLowerCase();
+    const game = document.getElementById("gameFilter").value;
+    const category = document.getElementById("categoryFilter").value;
+
+    const scripts = JayLibrary.getAll();
+
+    const filtered = scripts.filter(item =>
+        (item.name.toLowerCase().includes(search) ||
+         item.game.toLowerCase().includes(search)) &&
+        (!game || item.game === game) &&
+        (!category || item.category === category)
+    );
+
+    list.innerHTML = "";
+
+    if (!filtered.length) {
+        list.textContent = "No saved scripts found.";
+    }
+
+    filtered.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "script";
+
+        const title = document.createElement("h3");
+        title.textContent = item.name;
+
+        const details = document.createElement("small");
+        details.textContent = "Game: " + item.game + " | Category: " + item.category;
+
+        const load = document.createElement("button");
+        load.textContent = "Load";
+        load.onclick = () => {
+            document.getElementById("scriptName").value = item.name;
+            document.getElementById("gameName").value = item.game;
+            document.getElementById("category").value = item.category;
+            document.getElementById("scriptCode").value = item.script;
+        };
+
+        const rename = document.createElement("button");
+        rename.textContent = "Rename";
+        rename.onclick = () => {
+            const newName = prompt("Enter new script name:", item.name);
+            if (newName && newName.trim()) {
+                JayLibrary.rename(item.id, newName.trim());
+                displayScripts();
+            }
+        };
+
+        const remove = document.createElement("button");
+        remove.textContent = "Delete";
+        remove.className = "delete";
+        remove.onclick = () => {
+            if (confirm("Delete this saved script?")) {
+                JayLibrary.delete(item.id);
+                displayScripts();
+            }
+        };
+
+        card.append(title, details, document.createElement("br"), load, rename, remove);
+        list.appendChild(card);
+    });
+
+    updateFilters(scripts);
+}
+
+function updateFilters(scripts) {
+    const gameFilter = document.getElementById("gameFilter");
+    const categoryFilter = document.getElementById("categoryFilter");
+
+    const selectedGame = gameFilter.value;
+    const selectedCategory = categoryFilter.value;
+
+    gameFilter.innerHTML = '<option value="">All Games</option>';
+    categoryFilter.innerHTML = '<option value="">All Categories</option>';
+
+    [...new Set(scripts.map(s => s.game))].forEach(game => {
+        const option = document.createElement("option");
+        option.value = game;
+        option.textContent = game;
+        gameFilter.appendChild(option);
+    });
+
+    [...new Set(scripts.map(s => s.category))].forEach(category => {
+        const option = document.createElement("option");
+        option.value = category;
+        option.textContent = category;
+        categoryFilter.appendChild(option);
+    });
+
+    gameFilter.value = selectedGame;
+    categoryFilter.value = selectedCategory;
+}
+
+displayScripts();
+</script>
+
+</body>
+</html>
